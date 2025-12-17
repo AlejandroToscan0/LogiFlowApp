@@ -1,0 +1,47 @@
+_format_version: "3.0"
+
+services:
+
+  # -------------------------
+  # PEDIDO SERVICE
+  # -------------------------
+  - name: pedido-service
+    url: http://host.docker.internal:8080
+    routes:
+      - name: pedido-route
+        paths:
+          - /api/orders
+        strip_path: false
+
+  # -------------------------
+  # AUTH SERVICE
+  # -------------------------
+  - name: auth-service
+    url: http://host.docker.internal:8081
+    routes:
+      - name: auth-route
+        paths:
+          - /api/auth
+        strip_path: false
+
+  # -------------------------
+  # BILLING SERVICE
+  # -------------------------
+  - name: billing-service
+    url: http://host.docker.internal:8082
+    routes:
+      - name: billing-route
+        paths:
+          - /api/billing
+        strip_path: false
+
+  # -------------------------
+  # FLEET SERVICE
+  # -------------------------
+  - name: fleet-service
+    url: http://host.docker.internal:8083
+    routes:
+      - name: fleet-route
+        paths:
+          - /api/flota
+        strip_path: false
