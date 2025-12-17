@@ -1,22 +1,20 @@
-# LogiFlow — Microservicios de entrega (U2)
+# LogiFlow — Sistema de microservicios
 
-Este repositorio contiene un sistema basado en microservicios para una app de entregas. Incluye servicios de autenticación, gestión de flota, pedidos y facturación (Billing). Está construido principalmente con Spring Boot (Java 17), Maven y PostgreSQL, y soporta ejecución local con Docker.
+Este repositorio contiene un sistema basado en microservicios para una aplicación de entregas. Incluye servicios de autenticación, gestión de flota, pedidos y facturación. Está construido con Spring Boot (Java 17), Maven y PostgreSQL, y soporta ejecución local con Docker.
 
-## 🧭 Contexto del proyecto
+## Contexto del proyecto
 
-- Arquitectura por microservicios (cada servicio con su propio `pom.xml`):
-	- `auth-service`: autenticación y gestión de usuarios/roles.
-	- `fleet-service`: registro y estado de vehículos (camión/livianos), repositorio de flota.
-	- `pedido_service`: base del servicio de pedidos (pendiente de expansión).
-	- `billing-service`: cálculo de tarifa básica y generación de factura en estado BORRADOR, persistida en PostgreSQL.
+Arquitectura por microservicios (cada servicio con su propio `pom.xml`):
+- `auth-service`: autenticación y gestión de usuarios y roles.
+- `fleet-service`: registro y estado de vehículos (motorizados, camiones y livianos).
+- `pedido_service`: base del servicio de pedidos (estructura inicial, pendiente de definición de endpoints).
+- `billing-service`: cálculo de tarifa básica y generación de factura en estado BORRADOR, con persistencia en PostgreSQL.
 
-- Base de datos: PostgreSQL.
-	- Puede apuntar al servidor principal del usuario en `localhost:5432`.
-	- Alternativa de desarrollo: contenedor de Postgres y pgAdmin vía `docker-compose` dentro de `billing-service` (puerto `5433` para evitar conflictos).
+Base de datos: PostgreSQL. Se puede apuntar al servidor principal del usuario en `localhost:5432`. Para desarrollo, existe una alternativa mediante contenedor de Postgres y pgAdmin vía `docker-compose` dentro de `billing-service` (puerto `5433`) para evitar conflictos.
 
-- ORM: Spring Data JPA (Hibernate 7). El esquema se crea/actualiza con `ddl-auto=update`.
+ORM: Spring Data JPA (Hibernate). El esquema se crea o actualiza con `ddl-auto=update` en cada servicio.
 
-## 📦 Tecnologías y versiones
+## Tecnologías
 
 - Java 17
 - Spring Boot 4.x
@@ -24,10 +22,10 @@ Este repositorio contiene un sistema basado en microservicios para una app de en
 - Spring MVC, Jakarta Validation
 - Spring Data JPA + Hibernate
 - PostgreSQL + HikariCP
-- Docker y Docker Compose (opcional para desarrollo)
-- pgAdmin (opcional para inspección de DB)
+- Docker y Docker Compose (opcional)
+- pgAdmin (opcional)
 
-## 🗂️ Estructura principal
+## Estructura del repositorio
 
 ```
 distribuidas_pryU2_logiflow/
@@ -36,91 +34,70 @@ distribuidas_pryU2_logiflow/
 	fleet-service/
 	pedido_service/
 	billing-service/
-		docker-compose.yml   # Postgres + pgAdmin (dev)
+		docker-compose.yml
 		src/main/resources/application.yaml
 		src/main/java/... BillingServiceApplication.java, controller, service, model, repository
 ```
 
-## 🧩 BillingService — Funcionalidad mínima
+## Configuración por servicio
 
-Endpoints (puerto por defecto: `8080`):
+- `auth-service` (puerto 8081)
+	- Base de datos: `jdbc:postgresql://localhost:5432/logiflow_auth`
+	- Usuario: `postgres`
+	- Contraseña: `root` (actualiza según tu entorno)
 
-- POST `/api/billing/calculate`
-	- Request JSON: `{ "distanceKm": number, "durationMin": number }`
-	- Respuesta: `BigDecimal` con el valor calculado.
-	- Fórmula: `BASE_FARE(2.50) + PER_KM(1.20)*distanceKm + PER_MIN(0.25)*durationMin`.
+- `fleet-service` (puerto 8083)
+	- Base de datos: `jdbc:postgresql://localhost:5432/logiflow_fleet`
+	- Usuario: `postgres`
+	- Contraseña: `root` (actualiza según tu entorno)
 
-- POST `/api/billing/invoices?customerId=...`
-	- Request JSON: igual que `/calculate`.
-	- Crea una factura en estado `BORRADOR` y la persiste en la tabla `invoices`.
-	- Respuesta: `InvoiceResponseDto` con `{ id, customerId, amount, state, createdAt }`.
+- `pedido_service` (puerto 8080)
+	- Base de datos: `jdbc:postgresql://localhost:5432/pedido_db`
+	- Usuario: `postgres`
+	- Contraseña: `slvplanA2003` (actualiza según tu entorno)
 
-Entidad JPA `Invoice`:
-- `id` (UUID String), `customer_id`, `amount`, `state` (ENUM almacenado como STRING), `created_at`.
+- `billing-service` (puerto 8080)
+	- Base de datos: `jdbc:postgresql://localhost:5432/delivery`
+	- Usuario: `delivery_user`
+	- Contraseña: `qwerty123`
 
-## 🚀 Cómo ejecutar
+Cada servicio define su configuración en `src/main/resources/application.yaml`. Se pueden sobrescribir mediante variables de entorno estándar de Spring (ver más abajo).
 
-### Prerrequisitos
+## Ejecución de los servicios
 
-- Java 17 y Maven instalados.
-- Opcional: Docker y Docker Compose para levantar Postgres/pgAdmin de desarrollo.
+Prerrequisitos: Java 17 y Maven instalados. Docker y Docker Compose son opcionales (solo necesarios si se usa la alternativa de base de datos en contenedor).
 
-### Opción A: Usar tu PostgreSQL en `localhost:5432`
+### Ejecución con PostgreSQL local (puerto 5432)
 
-1) Asegúrate de tener una base `delivery` y un usuario con permisos.
-	 - Por defecto el servicio usa: usuario `delivery_user`, contraseña `qwerty123` (puedes cambiarlo vía variables de entorno o editar `application.yaml`).
-
-2) Compila y ejecuta `billing-service`:
+Para cada servicio:
 
 ```zsh
-cd billing-service
+cd <nombre-del-servicio>
 mvn -DskipTests package
 mvn -DskipTests spring-boot:run
 ```
 
-3) Prueba los endpoints (ejemplos):
+Variables de entorno de ejemplo para sobrescribir conexión:
 
 ```zsh
-# Calcular tarifa
-curl -i -X POST http://localhost:8080/api/billing/calculate \
-	-H "Content-Type: application/json" \
-	-d '{"distanceKm":4.5,"durationMin":12}'
-
-# Crear factura BORRADOR para customerId=cliente123
-curl -i -X POST 'http://localhost:8080/api/billing/invoices?customerId=cliente123' \
-	-H "Content-Type: application/json" \
-	-d '{"distanceKm":4.5,"durationMin":12}'
+export SPRING_DATASOURCE_URL='jdbc:postgresql://localhost:5432/<base>'
+export SPRING_DATASOURCE_USERNAME='<usuario>'
+export SPRING_DATASOURCE_PASSWORD='<contraseña>'
+mvn -DskipTests spring-boot:run
 ```
 
-### Opción B: Levantar Postgres + pgAdmin con Docker (puerto 5433)
+### Ejecución con Docker (solo `billing-service`)
 
-Esta opción evita conflictos si ya tienes Postgres en 5432.
+Dentro de `billing-service` existe `docker-compose.yml` que levanta Postgres en `5433` y pgAdmin en `8085`.
 
 ```zsh
 cd billing-service
 docker compose up -d
-
-# Compilar y ejecutar la app
 mvn -DskipTests package
 mvn -DskipTests spring-boot:run
 ```
 
-pgAdmin estará disponible en `http://localhost:8085` (usuario y contraseña por defecto definidos en `docker-compose.yml`).
-
-### Variables de entorno útiles
-
-Puedes sobrescribir la conexión sin tocar `application.yaml` usando variables estándar de Spring:
-
-```zsh
-export SPRING_DATASOURCE_URL='jdbc:postgresql://localhost:5432/delivery'
-export SPRING_DATASOURCE_USERNAME='delivery_user'
-export SPRING_DATASOURCE_PASSWORD='qwerty123'
-
-# Ejecutar
-mvn -DskipTests spring-boot:run
-```
-
-Si usas el contenedor en 5433:
+Si se usa el contenedor en `5433`, se puede ajustar la conexión con variables de entorno:
 
 ```zsh
 export SPRING_DATASOURCE_URL='jdbc:postgresql://localhost:5433/delivery'
@@ -129,12 +106,47 @@ export SPRING_DATASOURCE_PASSWORD='qwerty123'
 mvn -DskipTests spring-boot:run
 ```
 
-## 🔍 Verificación en la base de datos
+## Endpoints por servicio
 
-Con pgAdmin (Docker):
-- Conéctate al servidor `localhost:5433` (o `5432` si usas tu instancia).
+### auth-service (puerto 8081)
+
+- `POST /api/auth/register` — Registrar usuario.
+- `POST /api/auth/login` — Autenticar usuario.
+- `GET /api/auth` — Listar usuarios.
+- `GET /api/auth/{id}` — Obtener usuario por ID.
+- `PUT /api/auth/{id}` — Actualizar usuario.
+- `DELETE /api/auth/{id}` — Eliminar usuario.
+
+### fleet-service (puerto 8083)
+
+- `POST /api/flota/motorizados` — Crear motorizado.
+- `POST /api/flota/camiones` — Crear camión.
+- `POST /api/flota/livianos` — Crear vehículo liviano.
+- `GET /api/flota` — Listar flota.
+- `PATCH /api/flota/{id}/estado?estado=...` — Actualizar estado del vehículo.
+
+### billing-service (puerto 8080)
+
+- `POST /api/billing/calculate`
+	- Request JSON: `{ "distanceKm": number, "durationMin": number }`
+	- Respuesta: decimal con el valor calculado.
+	- Fórmula: `2.50 + 1.20 * distanceKm + 0.25 * durationMin`.
+
+- `POST /api/billing/invoices?customerId=...`
+	- Request JSON: mismo formato que `/calculate`.
+	- Crea una factura en estado `BORRADOR` y la persiste en `invoices`.
+	- Respuesta: `{ id, customerId, amount, state, createdAt }`.
+
+### pedido_service (puerto 8080)
+
+Servicio en estado inicial. Estructura y conexión a base definidas; endpoints pendientes de implementación.
+
+## Verificación en la base de datos
+
+Con pgAdmin (Docker, para `billing-service`):
+- Servidor: `localhost:5433` (o `5432` si se usa instancia local).
 - Base de datos: `delivery`.
-- Esquema `public`, tabla `invoices`: verifica filas insertadas tras crear facturas.
+- Esquema `public`, tabla `invoices`: verificar filas insertadas tras crear facturas.
 
 Con `psql` en Docker:
 
@@ -142,31 +154,33 @@ Con `psql` en Docker:
 docker exec -it billing-service-postgres psql -U delivery_user -d delivery -c "SELECT id, customer_id, amount, state, created_at FROM invoices ORDER BY created_at DESC LIMIT 5;"
 ```
 
-## 🧪 Pruebas (pendiente/opcional)
+## Pruebas
 
-- Añadir tests unitarios para el cálculo de tarifa y tests de integración con Testcontainers/H2.
-- Ejecutar: `mvn test`.
+Pendiente de agregar pruebas unitarias e integración (cálculo de tarifa, persistencia con Testcontainers/H2). Ejecución estándar:
 
-## 🧱 Notas de arquitectura
+```zsh
+mvn test
+```
 
-- Cada servicio es independiente, con su propio `pom.xml`.
-- `billing-service` usa JPA y crea la tabla `invoices` automáticamente (`ddl-auto=update`).
+## Consideraciones de arquitectura
+
+- Cada servicio es independiente, con su propio ciclo de vida y despliegue.
+- Se utiliza JPA con `ddl-auto=update` para gestionar el esquema en desarrollo.
 - El estado de factura se almacena como texto (`BORRADOR`, `EMITIDA`, `PAGADA`, `CANCELADA`).
-- No se realizaron cambios en un API Gateway dentro de este repositorio durante esta implementación.
+- No se realizaron cambios en un API Gateway dentro de este repositorio durante la implementación del servicio de facturación.
 
-## 🛠️ Solución de problemas
+## Solución de problemas
 
-- Error de autenticación Postgres (ej.: `FATAL: password authentication failed for user "delivery_user"`):
-	- Verifica usuario/contraseña y permisos en la base `delivery`.
-	- Alternativamente, exporta credenciales válidas vía variables de entorno (ver sección anterior).
-	- Asegura que el usuario tenga `CONNECT` a la base y privilegios `USAGE/CREATE` en el esquema `public`.
+- Error de autenticación PostgreSQL (por ejemplo, `FATAL: password authentication failed`):
+	- Verificar usuario y contraseña configurados en `application.yaml` o variables de entorno.
+	- Asegurar privilegios `CONNECT` sobre la base y `USAGE/CREATE` sobre el esquema `public`.
 
-- Error de dialecto Hibernate (por fallo de metadata JDBC):
-	- Suele ser consecuencia de no poder conectarse a la DB. Soluciona la autenticación.
+- Error de dialecto Hibernate (derivado de fallo de conexión):
+	- Revisar conectividad y credenciales; corregir la autenticación.
 
 - Puerto ocupado (5432):
-	- Usa la opción Docker en 5433 para desarrollo, o detén la instancia que ocupa 5432.
+	- Utilizar la opción de Docker en `5433` para desarrollo, o detener la instancia que ocupa `5432`.
 
-## 📄 Licencia
+## Licencia
 
-Proyecto académico. Uso interno para la materia de Sistemas Distribuidos.
+Proyecto académico para la materia de Sistemas Distribuidos. Uso interno.

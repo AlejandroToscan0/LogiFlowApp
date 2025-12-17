@@ -1,7 +1,6 @@
 _format_version: "3.0"
 
 services:
-
   # -------------------------
   # PEDIDO SERVICE
   # -------------------------
@@ -28,7 +27,7 @@ services:
   # BILLING SERVICE
   # -------------------------
   - name: billing-service
-    url: http://host.docker.internal:8082
+    url: http://host.docker.internal:8080
     routes:
       - name: billing-route
         paths:
